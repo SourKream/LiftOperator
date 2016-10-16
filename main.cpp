@@ -2,6 +2,7 @@
 #include <vector>
 #include <math.h>
 #include <stdio.h>
+#include <map>
 using namespace std;
 
 #define N 5
@@ -43,10 +44,11 @@ public:
 
 	State (unsigned long long hash){
 		
-		DownButtons = (unsigned char) (((1 << N) - 1) & hash);
-		hash >>= N;
-		UpButtons = (unsigned char) (((1 << N) - 1) & hash);
-		hash >>= N;
+		DownButtons = (unsigned char) (((1 << (N-1)) - 1) & hash);
+		DownButtons <<= 1;
+		hash >>= N-1;
+		UpButtons = (unsigned char) (((1 << (N-1)) - 1) & hash);
+		hash >>= N-1;
 
 		for (int i=0; i<K; i++){
 			LiftButtons[i] = (unsigned char) (((1 << N) - 1) & hash); 
@@ -90,7 +92,8 @@ public:
 	}
 
 	bool isPossible(int action, unsigned char actionsPossible[]){
-		for (int i=0; i < 5; i++){
+
+		for (int i=0; i < K; i++){
 			if ((actionsPossible[i] & (1 << (action % 5))) == 0)
 				return false;
 			action /= 5;
@@ -252,10 +255,10 @@ public:
 			hash |= (unsigned long long)LiftButtons[i];
 		}
 
-		hash <<= N;
+		hash <<= N-1;
 		hash |= (unsigned long long)UpButtons;
-		hash <<= N;
-		hash |= (unsigned long long)DownButtons;
+		hash <<= N-1;
+		hash |= (unsigned long long)(DownButtons >> 1);
 
 		return hash;
 	}
@@ -270,9 +273,10 @@ class PolicyEvaluation{
 
 public:
 
-	int numStates = pow(2,25);
-	float minCosts[(const int)pow(2,25)];
-	int minCostActions[(const int)pow(2,25)];
+	map<unsigned long long, int> hashToIdx;
+	int numStates = 0;
+	vector<float> minCosts;
+	vector<int> minCostActions;
 	float error = 0;
 
 	void computeMinCostForState(unsigned long long stateHash){
@@ -285,32 +289,48 @@ public:
 
 		for (int i=0; i<actions.size(); i++){
 			vector<State> neighbours = state.getNeighboursForAction(actions[i]);
+			initialiseStates(neighbours);
 			float cost = 0;
 			for (int j=0; j<neighbours.size(); j++)
-				cost += neighbours[j].proba * (neighbours[j].getImmediateCost() + minCosts[neighbours[j].getHash()]);
+				cost += neighbours[j].proba * (neighbours[j].getImmediateCost() + minCosts[hashToIdx[neighbours[j].getHash()]]);
 			if (cost < minCost){
 				minCost = cost;
 				minCostAction = actions[i];
 			}
 		}
 
-		if (fabs(minCosts[stateHash] - minCost) > error)
-			error = fabs(minCosts[stateHash] - minCost);
+		if (fabs(minCosts[hashToIdx[stateHash]] - minCost) > error)
+			error = fabs(minCosts[hashToIdx[stateHash]] - minCost);
 
-		minCosts[stateHash] = minCost;
-		minCostActions[stateHash] = minCostAction;
+		minCosts[hashToIdx[stateHash]] = minCost;
+		minCostActions[hashToIdx[stateHash]] = minCostAction;
+	}
+
+	void initialiseStates(vector<State> states){
+		for (int i=0; i<states.size(); i++){
+			if (hashToIdx.find(states[i].getHash()) == hashToIdx.end()){
+				hashToIdx[states[i].getHash()] = numStates++;
+				minCosts.push_back(0);
+				minCostActions.push_back(0);
+			}
+		}
 	}
 
 	void LearnMinCosts(){
 
-		for (int i=0; i<numStates; i++)
-			minCosts[i] = 0;
+		hashToIdx[0] = numStates++;		
+		minCosts.push_back(0);
+		minCostActions.push_back(0);
 
+		int count = 0;
 		while (true){
-			for (int i=0; i<numStates; i++)
-				computeMinCostForState(i);
+			for ( const auto &myPair : hashToIdx ){ 
+				cout << "Looping : " << count++ << ", NumStates: " << numStates << ", Error : " << error << "\n";
+				computeMinCostForState(myPair.first);
+			}
 			if (error < 1)
 				break;
+			error = 0;
 		}
 	}
 
@@ -320,6 +340,11 @@ int main(){
 
 	PolicyEvaluation evaluation;
 	evaluation.LearnMinCosts();
+
+//	State state(0);
+//	vector<int> actions = state.getActions();
+
+//	cout << "Size : " << actions.size() << endl;
 
 	return 0;
 }
