@@ -61,7 +61,7 @@ public:
 		}
 	}
 
-	vector<int> getActions(){
+	void getActions (int actions[], int &n){
 		// 0 - Stay
 		// 1 - Go Up
 		// 2 - Go Down
@@ -72,23 +72,39 @@ public:
 		unsigned char actionsPossible[K];
 
 		for (int i=0; i<K; i++){
-/*			actionsPossible[i] = 0;
+			// Open with Down possible?
+			actionsPossible[i] = 0;
+			if ((DownButtons & LiftPositions[i]) != 0) 
+				actionsPossible[i] |= 1;
+
+			// Open with Up possible?
+			actionsPossible[i] <<= 1;
+			if ((UpButtons & LiftPositions[i]) != 0) 
+				actionsPossible[i] |= 1;
+
+			// Go Down possible?
+			actionsPossible[i] <<= 1;
 			if (((LiftPositions[i] - 1) & LiftButtons[i]) != 0) 
 				actionsPossible[i] |= 1;
+
+			// Go Up possible?
 			actionsPossible[i] <<= 1;
 			if ((~(LiftPositions[i] - 1) & LiftButtons[i]) != 0) 
 				actionsPossible[i] |= 1;
+
+			// Stay possible?
 			actionsPossible[i] <<= 1;
-*/
-			actionsPossible[i] = (1 << 5) - 1;
+			if (LiftButtons[i] == 0)
+				actionsPossible[i] |= 1;
+
+//			actionsPossible[i] = (1 << 5) - 1;
 		}
 
-		vector<int> actions;
+		n = 0;
 		for (int i=0; i<pow(5, K); i++)
 			if (isPossible(i, actionsPossible))
-				actions.push_back(i);
+				actions[n++] = i;
 		
-		return actions;
 	}
 
 	bool isPossible(int action, unsigned char actionsPossible[]){
@@ -282,12 +298,13 @@ public:
 	void computeMinCostForState(unsigned long long stateHash){
 
 		State state(stateHash);
-		vector<int> actions = state.getActions();
+		int actions[(const int)pow(5, K)], numActions;
+		state.getActions(actions, numActions);
 
 		float minCost = 999999999;
 		int minCostAction;
 
-		for (int i=0; i<actions.size(); i++){
+		for (int i=0; i<numActions; i++){
 			vector<State> neighbours = state.getNeighboursForAction(actions[i]);
 			initialiseStates(neighbours);
 			float cost = 0;
@@ -307,13 +324,14 @@ public:
 	}
 
 	void initialiseStates(vector<State> states){
-		for (int i=0; i<states.size(); i++){
-			if (hashToIdx.find(states[i].getHash()) == hashToIdx.end()){
-				hashToIdx[states[i].getHash()] = numStates++;
-				minCosts.push_back(0);
-				minCostActions.push_back(0);
+		if (numStates < 8126464)
+			for (int i=0; i<states.size(); i++){
+				if (hashToIdx.find(states[i].getHash()) == hashToIdx.end()){
+					hashToIdx[states[i].getHash()] = numStates++;
+					minCosts.push_back(0);
+					minCostActions.push_back(0);
+				}
 			}
-		}
 	}
 
 	void LearnMinCosts(){
