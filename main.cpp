@@ -604,8 +604,8 @@ public:
 			return Transform2(minCostActions[hashToIdx[gameState.getSymmetricHash2()]]);
 		if (hashToIdx.find(gameState.getSymmetricHash3()) != hashToIdx.end())
 			return Transform1(Transform2(minCostActions[hashToIdx[gameState.getSymmetricHash3()]]));
-		if (hashToIdx.find(gameState.getHash()) != hashToIdx.end())
-			return minCostActions[hashToIdx[gameState.getHash()]];
+
+		return minCostActions[hashToIdx[gameState.getHash()]];
 	}
 
 	int Transform1 (int action){
@@ -671,7 +671,7 @@ public:
 
     if (numStates < 8126464)
       for (int i=0; i<states.size(); i++)
-				if (hashtoValue.find(states[i].getSymmetricHash()) == hashtoValue.end())
+				if (hashtoValue.find(states[i].getSymmetricHash1()) == hashtoValue.end())
 					if (hashtoValue.find(states[i].getHash()) == hashtoValue.end()){
             State state(states[i].getHash());
             int actions[(const int)pow(5, K)], numActions;
@@ -737,7 +737,7 @@ public:
 
             for (int i=0;i<neighbours.size();i++){
               hash_value = neighbours[i].getHash();
-              symmetric_hash_value = neighbours[i].getSymmetricHash();
+              symmetric_hash_value = neighbours[i].getSymmetricHash1();
               if(in_map(hash_value)){
                 new_tuple = hashtoValue[hash_value];
                 new_value += neighbours[i].proba*(get<0>(new_tuple));
@@ -771,7 +771,7 @@ public:
 
               for (int j=0;j<neighbours.size();j++){
                   hash_value = neighbours[j].getHash();
-                  symmetric_hash_value = neighbours[j].getSymmetricHash();
+                  symmetric_hash_value = neighbours[j].getSymmetricHash1();
                   if(in_map(hash_value)){
                       new_tuple = hashtoValue[hash_value];
                       next_action_value += neighbours[j].proba*(get<0>(new_tuple));
