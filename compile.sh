@@ -1,1 +1,1 @@
-g++ main.cpp -std=c++11 -w -O3
+g++ main.cpp -std=c++11 -O3
