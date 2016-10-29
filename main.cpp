@@ -127,7 +127,7 @@ public:
             if (LiftButtons[i] == 0)
                 actionsPossible[i] |= 1;
             
-            //			actionsPossible[i] = (1 << 5) - 1;
+            //          actionsPossible[i] = (1 << 5) - 1;
         }
         
         n = 0;
@@ -168,7 +168,7 @@ public:
                 }
                     temp.LiftButtons[i] &= (~LiftPositions[i]);
                     break;
-                case 4:	if ((DownButtons & LiftPositions[i])!= 0){
+                case 4: if ((DownButtons & LiftPositions[i])!= 0){
                     AddDownFloors[i] = true;
                     temp.DownButtons &= (~LiftPositions[i]);
                 }
@@ -263,7 +263,7 @@ public:
                 case 3: UpButtons &= (~LiftPositions[i]);
                     LiftButtons[i] &= (~LiftPositions[i]);
                     break;
-                case 4:	DownButtons &= (~LiftPositions[i]);
+                case 4: DownButtons &= (~LiftPositions[i]);
                     LiftButtons[i] &= (~LiftPositions[i]);
                     break;
             }
@@ -294,9 +294,9 @@ public:
     void applyTheirAction (string action){
         
         if (action[1] == 'D'){
-            DownButtons |= (1 << stoi(action.substr(3)));
+            DownButtons |= (1 << (stoi(action.substr(3))-1));
         } else if (action[1] == 'U'){
-            UpButtons |= (1 << stoi(action.substr(3)));
+            UpButtons |= (1 << (stoi(action.substr(3))-1));
         } else {
             string buttonString="", liftNumberString="";
             int j = 2;
@@ -305,7 +305,7 @@ public:
             j++;
             while (j < action.size())
                 liftNumberString += action[j++];
-            LiftButtons[stoi(liftNumberString)-1] |= (1 << stoi(buttonString));
+            LiftButtons[stoi(liftNumberString)-1] |= (1 << (stoi(buttonString)-1));
         }
     }
     
@@ -470,6 +470,7 @@ public:
     vector<float> minCosts;
     vector<int> minCostActions;
     float error = 0;
+    float discount = 0.99;
     
     //////////////////////////////////////////////////////////////////
     // Value Iteration
@@ -487,7 +488,7 @@ public:
             vector<State> neighbours = state.getNeighboursForAction(actions[i]);
             float cost = 0;
             for (int j=0; j<neighbours.size(); j++)
-                cost += neighbours[j].proba * (neighbours[j].getImmediateCost(actions[i]) + minCostOfState(neighbours[j]));
+                cost += neighbours[j].proba * (neighbours[j].getImmediateCost(actions[i]) + discount * minCostOfState(neighbours[j]));
             if (cost < minCost){
                 minCost = cost;
                 minCostAction = actions[i];
@@ -524,13 +525,11 @@ public:
         
         int count = 0;
         int iter = 0;
-        while (iter < 500){
+        while (iter < 2000){
             for ( const auto &myPair : hashToIdx ){
-                cout << "Iteration : " << iter << ", Looping : " << count++ << ", NumStates: " << numStates << ", Error : " << error << "\n";
+//                cout << "Iteration : " << iter << ", Looping : " << count++ << ", NumStates: " << numStates << ", Error : " << error << "\n";
                 computeMinCostForState(myPair.first);
             }
-            if (error < 1)
-                break;
             error = 0;
             count = 0;
             iter++;
@@ -557,7 +556,7 @@ public:
         
         while (true){
             
-            cout << "Game State : " << endl;
+/*            cout << "Game State : " << endl;
             gameState.print();
             cout << endl;
             cout << "Hash : ";
@@ -572,11 +571,10 @@ public:
             for (int i=0; i<n; i++)
                 cout << actions[i] << " ";
             cout << endl;
-            
+*/
             getline(cin, instructionIn);
             applyInputInstruction(instructionIn);
             bestAction = getBestActionForCurrentState();
-            cout << "BestAction found : " << bestAction << endl;
             gameState.applyMyAction(bestAction);
             gameState.printMyAction(bestAction);
         }
@@ -823,11 +821,11 @@ int main(){
     
     LiftOperator liftOperator;
     liftOperator.LearnMinCosts();
-    //	liftOperator.modified_policy_iteration();
+    //  liftOperator.modified_policy_iteration();
     
     cout << "0" << endl;
     
-    liftOperator.printPolicy();
+//    liftOperator.printPolicy();
     liftOperator.operate();
     
     return 0;
