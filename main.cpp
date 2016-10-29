@@ -104,12 +104,12 @@ public:
         for (int i=0; i<K; i++){
             // Open with Down possible?
             actionsPossible[i] = 0;
-            if (((DownButtons | LiftButtons[i]) & LiftPositions[i]) != 0)
+            if (((DownButtons | LiftButtons[i]) & LiftPositions[i] & (~1)) != 0)
                 actionsPossible[i] |= 1;
             
             // Open with Up possible?
             actionsPossible[i] <<= 1;
-            if (((UpButtons | LiftButtons[i]) & LiftPositions[i]) != 0)
+            if (((UpButtons | LiftButtons[i]) & LiftPositions[i] & ((1 << (N-1)) - 1)) != 0)
                 actionsPossible[i] |= 1;
             
             // Go Down possible?
@@ -119,7 +119,7 @@ public:
             
             // Go Up possible?
             actionsPossible[i] <<= 1;
-            if ((~(LiftPositions[i] - 1) & (LiftButtons[i] | UpButtons | DownButtons)) != 0)
+            if ((~(LiftPositions[i] - 1) & (~LiftPositions[i]) & (LiftButtons[i] | UpButtons | DownButtons)) != 0)
                 actionsPossible[i] |= 1;
             
             // Stay possible?
@@ -186,13 +186,13 @@ public:
             for (int n = 0; n<neighbours.size(); n++){
                 State temp(neighbours[n]);
                 if (AddUpFloors[i]){
-                    for (unsigned char j=LiftButtons[i]; j<=(((~(LiftPositions[i] - 1) & ~LiftPositions[i])&((1 << N)-1))|LiftButtons[i]); j = (j + (LiftPositions[i] << 1))|LiftButtons[i]){
+                    for (unsigned char j=((LiftPositions[i] << 1)|neighbours[n].LiftButtons[i]); j<=(((~(LiftPositions[i] - 1) & ~LiftPositions[i])&((1 << N)-1))|neighbours[n].LiftButtons[i]); j = (j + (LiftPositions[i] << 1))|neighbours[n].LiftButtons[i]){
                         temp.LiftButtons[i] = j;
                         temp_list.push_back(temp);
                     }
                 }
                 if (AddDownFloors[i]){
-                    for (int j = LiftButtons[i]; j<=((LiftPositions[i] - 1) | LiftButtons[i]); j = (j + 1)|LiftButtons[i]){
+                    for (int j = (neighbours[n].LiftButtons[i]|1); j<=((LiftPositions[i] - 1) | neighbours[n].LiftButtons[i]); j = (j + 1)|neighbours[n].LiftButtons[i]){
                         temp.LiftButtons[i] = j;
                         temp_list.push_back(temp);
                     }
@@ -218,8 +218,8 @@ public:
             
             // At 1st floor
             temp.proba = prob * q;
-            temp.DownButtons = DownButtons;
-            temp.UpButtons = (UpButtons | 1);
+            temp.DownButtons = neighbours[n].DownButtons;
+            temp.UpButtons = (neighbours[n].UpButtons | 1);
             temp_list.push_back(temp);
             
             // At floors 2 to N-1
@@ -228,21 +228,21 @@ public:
                     
                     // Wants to go Down
                     temp.proba = prob * ((1-q)/(N-1)) * (r + (1-r)*(i-1)/(N-2));
-                    temp.DownButtons = DownButtons | (1 << i);
-                    temp.UpButtons = UpButtons;
+                    temp.DownButtons = neighbours[n].DownButtons | (1 << i);
+                    temp.UpButtons = neighbours[n].UpButtons;
                     temp_list.push_back(temp);
                     
                     // Wants to go Up
                     temp.proba = prob * ((1-q)/(N-1)) * ((1-r)*(N-1-i)/(N-2));
-                    temp.DownButtons = DownButtons;
-                    temp.UpButtons = UpButtons | (1 << i);
+                    temp.DownButtons = neighbours[n].DownButtons;
+                    temp.UpButtons = neighbours[n].UpButtons | (1 << i);
                     temp_list.push_back(temp);
                 }
             
             // At floor N
             temp.proba = prob * ((1-q)/(N-1));
-            temp.DownButtons = DownButtons | (1 << (N-1));
-            temp.UpButtons = UpButtons;
+            temp.DownButtons = neighbours[n].DownButtons | (1 << (N-1));
+            temp.UpButtons = neighbours[n].UpButtons;
             temp_list.push_back(temp);
         }
         neighbours = temp_list;
@@ -481,7 +481,7 @@ public:
         state.getActions(actions, numActions);
         
         float minCost = 999999999;
-        int minCostAction;
+        int minCostAction = -1;
         
         for (int i=0; i<numActions; i++){
             vector<State> neighbours = state.getNeighboursForAction(actions[i]);
@@ -524,7 +524,7 @@ public:
         
         int count = 0;
         int iter = 0;
-        while (iter < 300){
+        while (iter < 500){
             for ( const auto &myPair : hashToIdx ){
                 cout << "Iteration : " << iter << ", Looping : " << count++ << ", NumStates: " << numStates << ", Error : " << error << "\n";
                 computeMinCostForState(myPair.first);
@@ -653,13 +653,29 @@ public:
     void printPolicy(){
         
         for ( const auto &myPair : hashToIdx ){
+            cout << "State ID : " << myPair.second << " ,Hash : " << myPair.first << endl;
             State state(myPair.first);
             state.print();
-            cout << "BestAction : "; state.printMyAction(minCostActions[myPair.second]);
+
+            int actions[(const int)pow(5, K)], numActions;
+            state.getActions(actions, numActions);
+            cout << "Num Actions : " << numActions;
+            
+            for (int i=0; i<numActions; i++){
+                cout << "\nAction : " << actions[i] << ", Neighbours : ";
+                vector<State> neigh = state.getNeighboursForAction(actions[i]);
+                for (int j=0; j<neigh.size(); j++)
+                    if (hashToIdx.find(neigh[j].getSymmetricHash1()) != hashToIdx.end())
+                        cout << hashToIdx[neigh[j].getSymmetricHash1()] << " ";
+                    else
+                        cout << hashToIdx[neigh[j].getHash()] << " ";
+                
+            }
+
+            cout << "\nBestAction : "; state.printMyAction(minCostActions[myPair.second]);
             cout << "\nMin Cost : " << minCostOfState(state);
             cout << "\n-------------------------------------------------------\n";
         }
-        
     }
     
     //////////////////////////////////////////////////////////////////
@@ -757,7 +773,7 @@ public:
             
             // update the policy for each state
             // consider all possible actions in the state and take the min over all reachable values
-            int best_action,best_value,next_action_value;
+            int best_action = -1,best_value,next_action_value;
             states_changed = 0;
             for ( const auto &myTuple : hashtoValue ){
                 State state(myTuple.first);
