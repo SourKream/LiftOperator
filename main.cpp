@@ -7,11 +7,12 @@
 #include <map>
 using namespace std;
 
-#define N 2
-#define K 1
+#define N 4
+#define K 2
 #define p 0.75
 #define q 0.25
 #define r 0.75
+#define discount 0.95
 
 static const unsigned char BitReverseTable256[] =
 {
@@ -469,8 +470,7 @@ public:
     int numStates = 0;
     vector<float> minCosts;
     vector<int> minCostActions;
-    float error = 0;
-    float discount = 0.99;
+    float error = 1;
     
     //////////////////////////////////////////////////////////////////
     // Value Iteration
@@ -525,14 +525,15 @@ public:
         
         int count = 0;
         int iter = 0;
-        while (iter < 2000){
+        while (error > 0){
+            error = 0;
             for ( const auto &myPair : hashToIdx ){
-//                cout << "Iteration : " << iter << ", Looping : " << count++ << ", NumStates: " << numStates << ", Error : " << error << "\n";
+                cout << "Iteration : " << iter << ", Looping : " << count++ << ", NumStates: " << numStates << ", Error : " << error << "\r";
                 computeMinCostForState(myPair.first);
             }
-            error = 0;
             count = 0;
             iter++;
+            cout << endl;
         }
     }
     
@@ -556,22 +557,22 @@ public:
         
         while (true){
             
-/*            cout << "Game State : " << endl;
-            gameState.print();
-            cout << endl;
-            cout << "Hash : ";
-            printHash(gameState.getHash());
-            printHash(gameState.getSymmetricHash1());
-            printHash(gameState.getSymmetricHash2());
-            printHash(gameState.getSymmetricHash3());
-            
-            int actions[25], n=0;
-            gameState.getActions(actions, n);
-            cout << "Actions Possible : ";
-            for (int i=0; i<n; i++)
-                cout << actions[i] << " ";
-            cout << endl;
-*/
+            /*            cout << "Game State : " << endl;
+             gameState.print();
+             cout << endl;
+             cout << "Hash : ";
+             printHash(gameState.getHash());
+             printHash(gameState.getSymmetricHash1());
+             printHash(gameState.getSymmetricHash2());
+             printHash(gameState.getSymmetricHash3());
+             
+             int actions[25], n=0;
+             gameState.getActions(actions, n);
+             cout << "Actions Possible : ";
+             for (int i=0; i<n; i++)
+             cout << actions[i] << " ";
+             cout << endl;
+             */
             getline(cin, instructionIn);
             applyInputInstruction(instructionIn);
             bestAction = getBestActionForCurrentState();
@@ -654,7 +655,7 @@ public:
             cout << "State ID : " << myPair.second << " ,Hash : " << myPair.first << endl;
             State state(myPair.first);
             state.print();
-
+            
             int actions[(const int)pow(5, K)], numActions;
             state.getActions(actions, numActions);
             cout << "Num Actions : " << numActions;
@@ -669,7 +670,7 @@ public:
                         cout << hashToIdx[neigh[j].getHash()] << " ";
                 
             }
-
+            
             cout << "\nBestAction : "; state.printMyAction(minCostActions[myPair.second]);
             cout << "\nMin Cost : " << minCostOfState(state);
             cout << "\n-------------------------------------------------------\n";
@@ -825,7 +826,7 @@ int main(){
     
     cout << "0" << endl;
     
-//    liftOperator.printPolicy();
+    //    liftOperator.printPolicy();
     liftOperator.operate();
     
     return 0;
