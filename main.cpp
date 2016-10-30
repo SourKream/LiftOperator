@@ -5,14 +5,15 @@
 #include <ctime>
 #include <climits>
 #include <map>
+#include <time.h>
 using namespace std;
 
-#define N 4
-#define K 2
+#define N 3
+#define K 1
 #define p 0.75
 #define q 0.25
 #define r 0.75
-#define discount 0.95
+#define discount 0.999
 
 static const unsigned char BitReverseTable256[] =
 {
@@ -471,6 +472,11 @@ public:
     vector<float> minCosts;
     vector<int> minCostActions;
     float error = 1;
+    time_t startTime;
+
+    LiftOperator(){
+        startTime = time(0);
+    }
     
     //////////////////////////////////////////////////////////////////
     // Value Iteration
@@ -525,15 +531,15 @@ public:
         
         int count = 0;
         int iter = 0;
-        while (error > 0){
+        while ((error > 0.00001) && (difftime(time(0), startTime) < 29*60)){
             error = 0;
             for ( const auto &myPair : hashToIdx ){
-                cout << "Iteration : " << iter << ", Looping : " << count++ << ", NumStates: " << numStates << ", Error : " << error << "\r";
+//                cout << "Iteration : " << iter << ", Looping : " << count++ << ", NumStates: " << numStates << ", Error : " << error << "\r";
                 computeMinCostForState(myPair.first);
             }
             count = 0;
             iter++;
-            cout << endl;
+//            cout << endl;
         }
     }
     
@@ -552,7 +558,7 @@ public:
     
     void operate(){
         
-        string instructionIn;
+        string instructionIn = "";
         int bestAction = 0;
         
         while (true){
@@ -574,6 +580,8 @@ public:
              cout << endl;
              */
             getline(cin, instructionIn);
+//            if (instructionIn != "")
+//                cerr << "Instruction In : \"" << instructionIn << "\"" << endl;
             applyInputInstruction(instructionIn);
             bestAction = getBestActionForCurrentState();
             gameState.applyMyAction(bestAction);
@@ -592,7 +600,7 @@ public:
                 temp = "";
             }
         }
-        if (temp != "0")
+        if ((temp != "0") && (temp != ""))
             gameState.applyTheirAction(temp);
     }
     
