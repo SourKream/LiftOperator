@@ -8,12 +8,16 @@
 #include <time.h>
 using namespace std;
 
-#define N 3
-#define K 1
-#define p 0.75
-#define q 0.25
-#define r 0.75
-#define discount 0.999
+// #define N 4
+// #define K 2
+// #define p 0.75
+// #define q 0.25
+// #define r 0.75
+// #define discount 0.99
+// #define maxIter 30
+
+int N, K, maxIter;
+float p, q, r, discount;
 
 static const unsigned char BitReverseTable256[] =
 {
@@ -49,8 +53,8 @@ public:
     
     unsigned char UpButtons;
     unsigned char DownButtons;
-    unsigned char LiftPositions[K];
-    unsigned char LiftButtons[K];
+    vector<unsigned char> LiftPositions;
+    vector<unsigned char> LiftButtons;
     
     float proba;
     
@@ -59,8 +63,8 @@ public:
         DownButtons = 0;
         proba = 0;
         for (int i=0; i<K; i++){
-            LiftPositions[i] = 1;
-            LiftButtons[i] = 0;
+            LiftPositions.push_back(1);
+            LiftButtons.push_back(0);
         }
     }
     
@@ -69,12 +73,16 @@ public:
         DownButtons = g.DownButtons;
         proba = g.proba;
         for (int i=0; i<K; i++){
-            LiftPositions[i] = g.LiftPositions[i];
-            LiftButtons[i] = g.LiftButtons[i];
+            LiftPositions.push_back(g.LiftPositions[i]);
+            LiftButtons.push_back(g.LiftButtons[i]);
         }
     }
     
     State (unsigned long long hash){
+        for (int i=0; i<K; i++){
+            LiftPositions.push_back(1);
+            LiftButtons.push_back(0);
+        }
         
         DownButtons = (unsigned char) (((1 << (N-1)) - 1) & hash);
         DownButtons <<= 1;
@@ -152,7 +160,12 @@ public:
     vector<State> getNeighboursForAction (int action){
         
         vector<State> neighbours;
-        bool AddUpFloors[K] = {}, AddDownFloors[K] = {};
+        vector<bool> AddUpFloors, AddDownFloors;
+
+        for (int i=0; i<K; i++){
+            AddUpFloors.push_back(false);
+            AddDownFloors.push_back(false);
+        }
         
         // Adding consequent of action taken
         State temp(*this);
@@ -531,7 +544,7 @@ public:
         
         int count = 0;
         int iter = 0;
-        while ((error > 0.00001) && (difftime(time(0), startTime) < 29*60)){
+        while ((error > 0.00001) && (difftime(time(0), startTime) < 29*60) && (iter <= maxIter)){
             error = 0;
             for ( const auto &myPair : hashToIdx ){
 //                cout << "Iteration : " << iter << ", Looping : " << count++ << ", NumStates: " << numStates << ", Error : " << error << "\r";
@@ -826,8 +839,25 @@ public:
     
 };
 
-int main(){
+void getParams(int argc, char *argv[]){
+    N = atoi(argv[1]);
+    K = atoi(argv[2]);
+    p = atof(argv[3]);
+    q = atof(argv[4]);
+    r = atof(argv[5]);
+    discount = atof(argv[6]);
+    maxIter = atoi(argv[7]);
+}
+
+int main(int argc, char *argv[]){
     
+    if (argc < 8){
+        cout << "Run as \"./liftOperator <N> <K> <p> <q> <r> <discount> <maxIter>\"\n";
+        return 0;
+    }
+
+    getParams(argc, argv);
+
     LiftOperator liftOperator;
     liftOperator.LearnMinCosts();
     //  liftOperator.modified_policy_iteration();
