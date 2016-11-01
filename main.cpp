@@ -177,13 +177,13 @@ public:
                     break;
                 case 2: temp.LiftPositions[i] >>= 1;
                     break;
-                case 3: if ((UpButtons & LiftPositions[i])!= 0){
+                case 3: if ((temp.UpButtons & LiftPositions[i])!= 0){
                     AddUpFloors[i] = true;
                     temp.UpButtons &= (~LiftPositions[i]);
                 }
                     temp.LiftButtons[i] &= (~LiftPositions[i]);
                     break;
-                case 4: if ((DownButtons & LiftPositions[i])!= 0){
+                case 4: if ((temp.DownButtons & LiftPositions[i])!= 0){
                     AddDownFloors[i] = true;
                     temp.DownButtons &= (~LiftPositions[i]);
                 }
@@ -437,7 +437,7 @@ public:
             action /= 5;
         }
         
-        return cost + 2*numPeopleWaiting;
+        return numPeopleWaiting;
     }
     
     void print(){
@@ -542,9 +542,11 @@ public:
         minCosts.push_back(0);
         minCostActions.push_back(0);
         
+        int timePerIter = 0;
+
         int count = 0;
         int iter = 0;
-        while ((error > 0.00001) && (difftime(time(0), startTime) < 29*60) && (iter <= maxIter)){
+        while ((error > 0.00001) && (difftime(time(0), startTime) + timePerIter < 29*60) && (iter <= maxIter)){
             error = 0;
             for ( const auto &myPair : hashToIdx ){
 //                cout << "Iteration : " << iter << ", Looping : " << count++ << ", NumStates: " << numStates << ", Error : " << error << "\r";
@@ -553,6 +555,8 @@ public:
             count = 0;
             iter++;
 //            cout << endl;
+            if (iter == 1)
+                timePerIter = difftime(time(0), startTime);
         }
     }
     
