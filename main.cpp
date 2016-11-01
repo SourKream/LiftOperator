@@ -4,17 +4,13 @@
 #include <stdio.h>
 #include <ctime>
 #include <climits>
+#include <string>
+#include <cstdlib>
 #include <map>
 #include <time.h>
+
 using namespace std;
 
-// #define N 4
-// #define K 2
-// #define p 0.75
-// #define q 0.25
-// #define r 0.75
-// #define discount 0.99
-// #define maxIter 30
 
 int N, K, maxIter;
 float p, q, r, discount;
@@ -48,16 +44,16 @@ unsigned int reverse32BitNumber (unsigned int num){
 }
 
 class State{
-    
+
 public:
-    
+
     unsigned char UpButtons;
     unsigned char DownButtons;
     vector<unsigned char> LiftPositions;
     vector<unsigned char> LiftButtons;
-    
+
     float proba;
-    
+
     State(){
         UpButtons = 0;
         DownButtons = 0;
@@ -67,7 +63,7 @@ public:
             LiftButtons.push_back(0);
         }
     }
-    
+
     State (const State &g){
         UpButtons = g.UpButtons;
         DownButtons = g.DownButtons;
@@ -77,30 +73,30 @@ public:
             LiftButtons.push_back(g.LiftButtons[i]);
         }
     }
-    
+
     State (unsigned long long hash){
         for (int i=0; i<K; i++){
             LiftPositions.push_back(1);
             LiftButtons.push_back(0);
         }
-        
+
         DownButtons = (unsigned char) (((1 << (N-1)) - 1) & hash);
         DownButtons <<= 1;
         hash >>= N-1;
         UpButtons = (unsigned char) (((1 << (N-1)) - 1) & hash);
         hash >>= N-1;
-        
+
         for (int i=K-1; i>=0; i--){
             LiftButtons[i] = (unsigned char) (((1 << N) - 1) & hash);
             hash >>= N;
         }
-        
+
         for (int i=K-1; i>=0; i--){
             LiftPositions[i] = (1 << (hash % N));
             hash /= N;
         }
     }
-    
+
     void getActions (int actions[], int &n){
         // 0 - Stay
         // 1 - Go Up
@@ -108,47 +104,47 @@ public:
         // 3 - Open with Up
         // 4 - Open with Down
         // Represented in Base 5
-        
+
         unsigned char actionsPossible[K];
-        
+
         for (int i=0; i<K; i++){
             // Open with Down possible?
             actionsPossible[i] = 0;
             if (((DownButtons | LiftButtons[i]) & LiftPositions[i] & (~1)) != 0)
                 actionsPossible[i] |= 1;
-            
+
             // Open with Up possible?
             actionsPossible[i] <<= 1;
             if (((UpButtons | LiftButtons[i]) & LiftPositions[i] & ((1 << (N-1)) - 1)) != 0)
                 actionsPossible[i] |= 1;
-            
+
             // Go Down possible?
             actionsPossible[i] <<= 1;
             if (((LiftPositions[i] - 1) & (LiftButtons[i] | UpButtons | DownButtons)) != 0)
                 actionsPossible[i] |= 1;
-            
+
             // Go Up possible?
             actionsPossible[i] <<= 1;
             if ((~(LiftPositions[i] - 1) & (~LiftPositions[i]) & (LiftButtons[i] | UpButtons | DownButtons)) != 0)
                 actionsPossible[i] |= 1;
-            
+
             // Stay possible?
             actionsPossible[i] <<= 1;
             if (LiftButtons[i] == 0)
                 actionsPossible[i] |= 1;
-            
+
             //          actionsPossible[i] = (1 << 5) - 1;
         }
-        
+
         n = 0;
         for (int i=0; i<pow(5, K); i++)
             if (isPossible(i, actionsPossible))
                 actions[n++] = i;
-        
+
     }
-    
+
     bool isPossible(int action, unsigned char actionsPossible[]){
-        
+
         for (int i=0; i < K; i++){
             if ((actionsPossible[i] & (1 << (action % 5))) == 0)
                 return false;
@@ -156,9 +152,9 @@ public:
         }
         return true;
     }
-    
+
     vector<State> getNeighboursForAction (int action){
-        
+
         vector<State> neighbours;
         vector<bool> AddUpFloors, AddDownFloors;
 
@@ -166,7 +162,7 @@ public:
             AddUpFloors.push_back(false);
             AddDownFloors.push_back(false);
         }
-        
+
         // Adding consequent of action taken
         State temp(*this);
         for (int i=0; i<K; i++){
@@ -194,7 +190,7 @@ public:
         }
         temp.proba = 1.0;
         neighbours.push_back(temp);
-        
+
         // Adding all possibilities of buttons pressed
         for (int i=0; i<K; i++){
             vector<State> temp_list;
@@ -216,44 +212,44 @@ public:
             if (temp_list.size() > 0)
                 neighbours = temp_list;
         }
-        
+
         // Adding all possible cases of someone arriving somewhere
         vector<State> temp_list;
         for (int n = 0; n<neighbours.size(); n++){
-            
+
             State temp(neighbours[n]);
             float prob = (float)1.0/(float)neighbours.size();
-            
+
             // No one arrives
             temp.proba = prob * (1 - p);
             temp_list.push_back(temp);
-            
+
             // Someone arrives
             prob *= p;
-            
+
             // At 1st floor
             temp.proba = prob * q;
             temp.DownButtons = neighbours[n].DownButtons;
             temp.UpButtons = (neighbours[n].UpButtons | 1);
             temp_list.push_back(temp);
-            
+
             // At floors 2 to N-1
             if (N > 2)
                 for (int i=1; i<N-1; i++){
-                    
+
                     // Wants to go Down
                     temp.proba = prob * ((1-q)/(N-1)) * (r + (1-r)*(i-1)/(N-2));
                     temp.DownButtons = neighbours[n].DownButtons | (1 << i);
                     temp.UpButtons = neighbours[n].UpButtons;
                     temp_list.push_back(temp);
-                    
+
                     // Wants to go Up
                     temp.proba = prob * ((1-q)/(N-1)) * ((1-r)*(N-1-i)/(N-2));
                     temp.DownButtons = neighbours[n].DownButtons;
                     temp.UpButtons = neighbours[n].UpButtons | (1 << i);
                     temp_list.push_back(temp);
                 }
-            
+
             // At floor N
             temp.proba = prob * ((1-q)/(N-1));
             temp.DownButtons = neighbours[n].DownButtons | (1 << (N-1));
@@ -261,12 +257,12 @@ public:
             temp_list.push_back(temp);
         }
         neighbours = temp_list;
-        
+
         return neighbours;
     }
-    
+
     void applyMyAction (int action){
-        
+
         for (int i=0; i<K; i++){
             switch(action % 5){
                 case 0:
@@ -285,9 +281,9 @@ public:
             action /= 5;
         }
     }
-    
+
     void printMyAction (int action) {
-        
+
         for (int i=0; i<K; i++){
             switch(action % 5){
                 case 0: cout << "AS" << i+1 << " ";
@@ -305,9 +301,9 @@ public:
         }
         cout << endl;
     }
-    
+
     void applyTheirAction (string action){
-        
+
         if (action[1] == 'D'){
             DownButtons |= (1 << (stoi(action.substr(3))-1));
         } else if (action[1] == 'U'){
@@ -323,111 +319,113 @@ public:
             LiftButtons[stoi(liftNumberString)-1] |= (1 << (stoi(buttonString)-1));
         }
     }
-    
+
     unsigned long long getHash(){
         // KN + 2N-2 + log2(N^K) <= 64
-        
+
         unsigned long long hash = 0;
-        
+
         for (int i=0; i<K; i++){
             hash *= N;
             hash += log2(LiftPositions[i]);
         }
-        
+
         for (int i=0; i<K; i++){
             hash <<= N;
             hash |= (unsigned long long)LiftButtons[i];
         }
-        
+
         hash <<= N-1;
         hash |= (unsigned long long)UpButtons;
         hash <<= N-1;
         hash |= (unsigned long long)(DownButtons >> 1);
-        
+
         return hash;
     }
-    
+
     unsigned long long getSymmetricHash1(){
         // KN + 2N-2 + log2(N^K) <= 64
-        
+
         unsigned long long hash = 0;
-        
+
         for (int i=0; i<K; i++){
             hash *= N;
             hash += N - 1 - log2(LiftPositions[i]);
         }
-        
+
         for (int i=0; i<K; i++){
             hash <<= N;
             hash |= (unsigned long long)(reverse32BitNumber(LiftButtons[i]) >> (32-N));
         }
-        
+
         hash <<= N-1;
         hash |= (unsigned long long)(reverse32BitNumber(DownButtons) >> (32-N));
         hash <<= N-1;
         hash |= (unsigned long long)(reverse32BitNumber(UpButtons) >> (32-N+1));
-        
+
         return hash;
     }
-    
+
     unsigned long long getSymmetricHash2(){
         // KN + 2N-2 + log2(N^K) <= 64
-        
+
         unsigned long long hash = 0;
-        
+
         for (int i=K-1; i>=0; i--){
             hash *= N;
             hash += log2(LiftPositions[i]);
         }
-        
+
         for (int i=K-1; i>=0; i--){
             hash <<= N;
             hash |= (unsigned long long)LiftButtons[i];
         }
-        
+
         hash <<= N-1;
         hash |= (unsigned long long)UpButtons;
         hash <<= N-1;
         hash |= (unsigned long long)(DownButtons >> 1);
-        
+
         return hash;
     }
-    
+
     unsigned long long getSymmetricHash3(){
         // KN + 2N-2 + log2(N^K) <= 64
-        
+
         unsigned long long hash = 0;
-        
+
         for (int i=K-1; i>=0; i--){
             hash *= N;
             hash += N - 1 - log2(LiftPositions[i]);
         }
-        
+
         for (int i=K-1; i>=0; i--){
             hash <<= N;
             hash |= (unsigned long long)(reverse32BitNumber(LiftButtons[i]) >> (32-N));
         }
-        
+
         hash <<= N-1;
         hash |= (unsigned long long)(reverse32BitNumber(DownButtons) >> (32-N));
         hash <<= N-1;
         hash |= (unsigned long long)(reverse32BitNumber(UpButtons) >> (32-N+1));
-        
+
         return hash;
     }
-    
+
     float getImmediateCost(int action){
-        
+
         int numPeopleWaiting = __builtin_popcount(UpButtons) + __builtin_popcount(DownButtons);
         for (int i=0; i<K; i++)
             numPeopleWaiting += __builtin_popcount(LiftButtons[i]);
-        
+
         int cost = 0;
         for (int i=0; i<K; i++){
             switch(action % 5){
                 case 0:
                     break;
                 case 1:
+                    cost+=1;
+                    break;
                 case 2: cost += 1;
                     break;
                 case 3:
@@ -436,10 +434,162 @@ public:
             }
             action /= 5;
         }
-        
+
+//        return cost + 2*numPeopleWaiting;
         return numPeopleWaiting;
     }
-    
+
+    float getImmediateCost_2(int action){
+      /*
+       I am assuming the following:- Please verify if these are correct
+       1. LSB of Downbuttons is Floor 2
+       2. LSB of Upbottons is Floor 1
+       3. log2(LiftPositions[i]) =0 represents lift is in floor 1, and so on.
+
+       */
+      int current_floor;
+      int cost = 0;
+      for (int i=0; i<K; i++){
+          switch(action % 5){
+              case 0:
+              {
+                  current_floor  = log2(LiftPositions[i])+1;
+                  for(int j=1;j<=N;j++){
+                    if(j>=2){
+                      if((DownButtons & (1u << (j-2))) !=0 )
+                        cost+= (abs( current_floor - j)+2)*2;
+                    }
+                    if(j<=N-1){
+                      if((UpButtons & (1u << (j-1))) !=0)
+                          cost+= (abs(current_floor - j)+2)*2;
+                    }
+                    if(LiftButtons[i] & (1u<<(j-1))){
+                        cost+=  (abs(current_floor - j)+1)*2;
+                    }
+                  }
+              }
+                  break;
+              case 1:
+              {
+                  current_floor = log2(LiftPositions[i])+1;
+                  for (int j=1;j<=N;j++){
+                    if(j>=2){
+                      if((DownButtons & (1u << (j-2))) !=0 ){
+                        if(j <= current_floor)
+                            cost+= (current_floor-j+2)*2;
+                        else
+                            cost+= (abs(current_floor -j)+1)*2;
+                      }
+                    }
+                    if(j<=N-1){
+                      if((UpButtons & (1u << (j-1))) !=0)
+                          if(j<= current_floor)
+                            cost+= (current_floor-j+2)*2;
+                          else
+                            cost+= (abs(current_floor-j)+1)*2;
+                    }
+                    if(LiftButtons[i] & (1u<<(j-1))){
+                        if(j<= current_floor)
+                          cost+= (current_floor-j+2)*2;
+                        else
+                          cost+= (abs(current_floor-j))*2;
+                    }
+                  }
+                  cost += 1;
+              }
+                  break;
+              case 2:
+              {
+                current_floor = log2(LiftPositions[i])+1;
+                for (int j=1;j<=N;j++){
+                  if(j>=2){
+                    if((DownButtons & (1u << (j-2))) !=0 ){
+                      if(j >= current_floor)
+                          cost+= (abs(current_floor-j)+2)*2;
+                      else
+                          cost+= (abs(current_floor -j)+1)*2;
+                    }
+                  }
+                  if(j<=N-1){
+                    if((UpButtons & (1u << (j-1))) !=0)
+                        if(j >= current_floor)
+                          cost+= (abs(current_floor-j)+2)*2;
+                        else
+                          cost+= (abs(current_floor-j)+1)*2;
+                  }
+                  if(LiftButtons[i] & (1u<<(j-1))){
+                      if(j >= current_floor)
+                        cost+= (abs(current_floor-j)+2)*2;
+                      else
+                        cost+= (abs(current_floor-j))*2;
+                  }
+                }
+                cost += 1;
+              }
+                  break;
+              case 3:
+              {
+                current_floor = log2(LiftPositions[i])+1;
+                for (int j=1;j<=N;j++){
+                  if(j>=2){
+                    if((DownButtons & (1u << (j-2))) !=0 ){
+                        if (j==current_floor)
+                          cost+=3*2;
+                        else
+                          cost+= (abs(current_floor -j)+2)*2;
+                    }
+                  }
+                  if(j<=N-1){
+                    if((UpButtons & (1u << (j-1))) !=0)
+                        if(j == current_floor)
+                          cost+= (1)*2;
+                        else
+                          cost+= (abs(current_floor-j)+2)*2;
+                  }
+                  if(LiftButtons[i] & (1u<<(j-1))){
+                      if(j == current_floor)
+                        cost+=0;
+                      else
+                        cost+= (abs(current_floor-j)+2)*2;
+                  }
+                }
+              }
+                  break;
+              case 4:
+              {
+                current_floor = log2(LiftPositions[i])+1;
+                for (int j=1;j<=N;j++){
+                  if(j>=2){
+                    if((DownButtons & (1u << (j-2))) !=0 ){
+                        if (j==current_floor)
+                          cost+=1*2;
+                        else
+                          cost+= (abs(current_floor -j)+2)*2;
+                    }
+                  }
+                  if(j<=N-1){
+                    if((UpButtons & (1u << (j-1))) !=0)
+                        if(j == current_floor)
+                          cost+= (3)*2;
+                        else
+                          cost+= (abs(current_floor-j)+2)*2;
+                  }
+                  if(LiftButtons[i] & (1u<<(j-1))){
+                      if(j == current_floor)
+                        cost+=0;
+                      else
+                        cost+= (abs(current_floor-j)+2)*2;
+                  }
+                }
+              }
+                  break;
+          }
+          action /= 5;
+      }
+      cerr << cost << endl;
+      return cost;
+    }
+
     void print(){
         for (int i=0; i<K; i++){
             cout << "Lift " << i+1 << "  : ";
@@ -473,13 +623,13 @@ public:
         }
         cout << endl;
     }
-    
+
 };
 
 class LiftOperator{
-    
+
 public:
-    
+
     map<unsigned long long, int> hashToIdx;
     int numStates = 0;
     vector<float> minCosts;
@@ -490,19 +640,19 @@ public:
     LiftOperator(){
         startTime = time(0);
     }
-    
+
     //////////////////////////////////////////////////////////////////
     // Value Iteration
-    
+
     void computeMinCostForState(unsigned long long stateHash){
-        
+
         State state(stateHash);
         int actions[(const int)pow(5, K)], numActions;
         state.getActions(actions, numActions);
-        
+
         float minCost = 999999999;
         int minCostAction = -1;
-        
+
         for (int i=0; i<numActions; i++){
             vector<State> neighbours = state.getNeighboursForAction(actions[i]);
             float cost = 0;
@@ -513,13 +663,14 @@ public:
                 minCostAction = actions[i];
             }
         }
-        
+
         error = max(error, (float)fabs(minCosts[hashToIdx[stateHash]] - minCost));
-        
+
         minCosts[hashToIdx[stateHash]] = minCost;
         minCostActions[hashToIdx[stateHash]] = minCostAction;
     }
-    
+
+
     float minCostOfState(State s){
         if (hashToIdx.find(s.getSymmetricHash1()) != hashToIdx.end())
             return minCosts[hashToIdx[s.getSymmetricHash1()]];
@@ -529,19 +680,18 @@ public:
             return minCosts[hashToIdx[s.getSymmetricHash3()]];
         if (hashToIdx.find(s.getHash()) != hashToIdx.end())
             return minCosts[hashToIdx[s.getHash()]];
-        
+
         hashToIdx[s.getHash()] = numStates++;
         minCosts.push_back(100);
         minCostActions.push_back(-1);
         return minCosts[hashToIdx[s.getHash()]];
     }
-    
+
     void LearnMinCosts(){
-        
+
         hashToIdx[0] = numStates++;
         minCosts.push_back(0);
         minCostActions.push_back(0);
-        
         int timePerIter = 0;
 
         int count = 0;
@@ -549,7 +699,7 @@ public:
         while ((error > 0.00001) && (difftime(time(0), startTime) + timePerIter < 29*60) && (iter <= maxIter)){
             error = 0;
             for ( const auto &myPair : hashToIdx ){
-//                cout << "Iteration : " << iter << ", Looping : " << count++ << ", NumStates: " << numStates << ", Error : " << error << "\r";
+               cout << "Iteration : " << iter << ", Looping : " << count++ << ", NumStates: " << numStates << ", Error : " << error << "\r";
                 computeMinCostForState(myPair.first);
             }
             count = 0;
@@ -559,12 +709,12 @@ public:
                 timePerIter = difftime(time(0), startTime);
         }
     }
-    
+
     //////////////////////////////////////////////////////////////////
     // Running operation on learnt policy
-    
+
     State gameState;
-    
+
     void printHash(unsigned long long hash){
         for (int i=0; i<N*K + 2*N - 2 + log2(pow(N,K)); i++){
             cout << hash%2;
@@ -572,14 +722,14 @@ public:
         }
         cout << endl;
     }
-    
+
     void operate(){
-        
+
         string instructionIn = "";
         int bestAction = 0;
-        
+
         while (true){
-            
+
             /*            cout << "Game State : " << endl;
              gameState.print();
              cout << endl;
@@ -588,7 +738,7 @@ public:
              printHash(gameState.getSymmetricHash1());
              printHash(gameState.getSymmetricHash2());
              printHash(gameState.getSymmetricHash3());
-             
+
              int actions[25], n=0;
              gameState.getActions(actions, n);
              cout << "Actions Possible : ";
@@ -597,15 +747,15 @@ public:
              cout << endl;
              */
             getline(cin, instructionIn);
-//            if (instructionIn != "")
-//                cerr << "Instruction In : \"" << instructionIn << "\"" << endl;
+            //if (instructionIn != "")
+            //cerr << "Instruction In : \"" << instructionIn << "\"" << endl;
             applyInputInstruction(instructionIn);
             bestAction = getBestActionForCurrentState();
             gameState.applyMyAction(bestAction);
             gameState.printMyAction(bestAction);
         }
     }
-    
+
     void applyInputInstruction(string instruction){
         string temp = "";
         for (int i=0; i<instruction.size(); i++){
@@ -620,7 +770,7 @@ public:
         if ((temp != "0") && (temp != ""))
             gameState.applyTheirAction(temp);
     }
-    
+
     int getBestActionForCurrentState(){
         if (hashToIdx.find(gameState.getSymmetricHash1()) != hashToIdx.end())
             return Transform1(minCostActions[hashToIdx[gameState.getSymmetricHash1()]]);
@@ -628,19 +778,19 @@ public:
             return Transform2(minCostActions[hashToIdx[gameState.getSymmetricHash2()]]);
         if (hashToIdx.find(gameState.getSymmetricHash3()) != hashToIdx.end())
             return Transform1(Transform2(minCostActions[hashToIdx[gameState.getSymmetricHash3()]]));
-        
+
         return minCostActions[hashToIdx[gameState.getHash()]];
     }
-    
+
     int Transform1 (int action){
-        
+
         int temp = 0;
         for (int i=0; i<K; i++){
             temp *= 5;
             temp += action % 5;
             action /= 5;
         }
-        
+
         int temp2 = 0;
         for (int i=0; i<K; i++){
             temp2 *= 5;
@@ -658,33 +808,33 @@ public:
             }
             temp /= 5;
         }
-        
+
         return temp2;
     }
-    
+
     int Transform2 (int action){
-        
+
         int temp = 0;
         for (int i=0; i<K; i++){
             temp *= 5;
             temp += action % 5;
             action /= 5;
         }
-        
+
         return temp;
     }
-    
+
     void printPolicy(){
-        
+
         for ( const auto &myPair : hashToIdx ){
             cout << "State ID : " << myPair.second << " ,Hash : " << myPair.first << endl;
             State state(myPair.first);
             state.print();
-            
+
             int actions[(const int)pow(5, K)], numActions;
             state.getActions(actions, numActions);
             cout << "Num Actions : " << numActions;
-            
+
             for (int i=0; i<numActions; i++){
                 cout << "\nAction : " << actions[i] << ", Neighbours : ";
                 vector<State> neigh = state.getNeighboursForAction(actions[i]);
@@ -693,41 +843,42 @@ public:
                         cout << hashToIdx[neigh[j].getSymmetricHash1()] << " ";
                     else
                         cout << hashToIdx[neigh[j].getHash()] << " ";
-                
+
             }
-            
+
             cout << "\nBestAction : "; state.printMyAction(minCostActions[myPair.second]);
             cout << "\nMin Cost : " << minCostOfState(state);
             cout << "\n-------------------------------------------------------\n";
         }
     }
-    
+
     //////////////////////////////////////////////////////////////////
     // Policy Iteration
-    
-    map<unsigned long long, tuple<float,int,int>> hashtoValue; // every state has a value, an index and the action
-    
+
+    map<unsigned long long, tuple<float,int>> hashtoValue; // every state has a value and the action
+
     void initialiseValueStates(vector<State> states){
-        
-        if (numStates < 8126464)
+
             for (int i=0; i<states.size(); i++)
                 if (hashtoValue.find(states[i].getSymmetricHash1()) == hashtoValue.end())
-                    if (hashtoValue.find(states[i].getHash()) == hashtoValue.end()){
-                        State state(states[i].getHash());
-                        int actions[(const int)pow(5, K)], numActions;
-                        state.getActions(actions, numActions);
-                        hashtoValue[states[i].getHash()] = make_tuple(0,numStates++,actions[0]);
-                    }
+                  if(hashtoValue.find(states[i].getSymmetricHash2())==hashtoValue.end())
+                    if(hashtoValue.find(states[i].getSymmetricHash3())==hashtoValue.end())
+                      if (hashtoValue.find(states[i].getHash()) == hashtoValue.end()){
+                          State state(states[i].getHash());
+                          int actions[(const int)pow(5, K)], numActions;
+                          state.getActions(actions, numActions);
+                          hashtoValue[states[i].getHash()] = make_tuple(0,actions[0]);
+                      }
     }
-    
-    
-    
+
+
+
     void generate_states(){
-        int max_size = 3300000;
+        int max_size = 1000000;
         State state(0);
         int actions[(const int)pow(5, K)], numActions;
         state.getActions(actions, numActions);
-        hashtoValue[0] = make_tuple(0,numStates++,actions[0]);// zero state
+        hashtoValue[0] = make_tuple(0,actions[0]);// zero state
         while(true){
             for ( const auto &myTuple : hashtoValue ){
                 State state(get<0>(myTuple));
@@ -742,105 +893,160 @@ public:
             }
         }
     }
-    
-    
-    bool in_map(unsigned long long hash1){
-        if(hashtoValue.find(hash1)!=hashtoValue.end())
-            return true;
-        return false;
+
+
+    map<unsigned long long,tuple<float,int>>::iterator for_searching;
+    float in_map(unsigned long long hash1){
+        for_searching = hashtoValue.find(hash1);
+        if(for_searching!=hashtoValue.end())
+            return get<0>(*for_searching);
+        return -1;
     }
-    
+
     void modified_policy_iteration(){
         const clock_t begin_time = clock();
-        // Generate all states and assign a random possible action to every state, fix the max number of states to 3M
+        // Generate all states and assign a random possible action to every state, fix the max number of states
         generate_states();
-        cout << float(clock()-begin_time)/CLOCKS_PER_SEC<<endl;
-        
+        cerr << float(clock()-begin_time)/CLOCKS_PER_SEC<<endl;
+
         int iterations=0;
-        int max_iterations = 25;
+        int max_iterations = 5;
         // Create the policy graph and calculate the values for every state assuning 0 value for starting state(0 state)
-        float new_value;
-        tuple<float,int,int> new_tuple;
-        State temp_state;
+        float immediate_cost,new_value;
         int states_changed;
+        unsigned long long hash_value,symmetric_hash_value1,symmetric_hash_value2,symmetric_hash_value3;
+        float getHashval,symmetric_hash_val1,symmetric_hash_val2,symmetric_hash_val3;
+
         while(iterations < max_iterations){
             // update the value of every state in the map, according to the current action
-            // if((float(clock()-begin_time)/CLOCKS_PER_SEC) >=1700){
-            //     break;
-            // }
+            if((float(clock()-begin_time)/CLOCKS_PER_SEC) >=15000){
+                 break;
+            }
             states_changed=0;
-            unsigned long long hash_value,symmetric_hash_value;
+
             for ( const auto &myTuple : hashtoValue ){
+
                 State state(myTuple.first);
-                new_value = state.getImmediateCost(get<2>(myTuple.second));
-                vector<State> neighbours = state.getNeighboursForAction(get<2>(myTuple.second));
-                
+                immediate_cost = state.getImmediateCost_2(get<1>(myTuple.second));
+                vector<State> neighbours = state.getNeighboursForAction(get<1>(myTuple.second));
+                new_value = 0;
                 for (int i=0;i<neighbours.size();i++){
                     hash_value = neighbours[i].getHash();
-                    symmetric_hash_value = neighbours[i].getSymmetricHash1();
-                    if(in_map(hash_value)){
-                        new_tuple = hashtoValue[hash_value];
-                        new_value += neighbours[i].proba*(get<0>(new_tuple));
+                    symmetric_hash_value1 = neighbours[i].getSymmetricHash1();
+                    symmetric_hash_value2 = neighbours[i].getSymmetricHash2();
+                    symmetric_hash_value3 = neighbours[i].getSymmetricHash3();
+                    getHashval = in_map(hash_value);
+                    symmetric_hash_val1 = in_map(symmetric_hash_value1);
+                    symmetric_hash_val2 = in_map(symmetric_hash_value2);
+                    symmetric_hash_val3 = in_map(symmetric_hash_value3);
+                    if(getHashval!=-1){
+                        new_value += neighbours[i].proba*(immediate_cost+discount * getHashval);
                     }
-                    else if(in_map(symmetric_hash_value)){
-                        new_tuple = hashtoValue[symmetric_hash_value];
-                        new_value += neighbours[i].proba*(get<0>(new_tuple));
+                    else if(symmetric_hash_val1!=-1){
+                        new_value += neighbours[i].proba*(immediate_cost+discount* symmetric_hash_val1);
                     }
-                    
+                    else if(symmetric_hash_val2!=-1){
+                        new_value += neighbours[i].proba*(immediate_cost+discount* symmetric_hash_val2);
+                    }
+                    else if(symmetric_hash_val3!=-1){
+                        new_value += neighbours[i].proba*(immediate_cost+discount* symmetric_hash_val3);
+                    }
                 }
-                
+
                 if(new_value!=get<0>(myTuple.second))
                     states_changed++;
-                hashtoValue[myTuple.first] = make_tuple(new_value,get<1>(myTuple.second),get<2>(myTuple.second));
+                hashtoValue[myTuple.first] = make_tuple(new_value,get<1>(myTuple.second));
             }
-            cout << "Percent Value Changes " << 100*(states_changed/((double)hashtoValue.size())) << endl;
-            
+
+            //cout << float(clock()-begin_time)/CLOCKS_PER_SEC<<endl;
+
             // update the policy for each state
             // consider all possible actions in the state and take the min over all reachable values
-            int best_action = -1,best_value,next_action_value;
+            int best_action,best_value,next_action_value;
             states_changed = 0;
             for ( const auto &myTuple : hashtoValue ){
                 State state(myTuple.first);
                 int actions[(const int)pow(5, K)], numActions;
                 state.getActions(actions, numActions);
                 best_value = INT_MAX;
-                
+                best_action = get<1>(myTuple.second);
                 for (int i=0; i<numActions; i++){
                     vector<State> neighbours = state.getNeighboursForAction(actions[i]);
-                    next_action_value = state.getImmediateCost(actions[i]);
-                    
+                    next_action_value = 0;
+                    immediate_cost = state.getImmediateCost_2(actions[i]);
                     for (int j=0;j<neighbours.size();j++){
                         hash_value = neighbours[j].getHash();
-                        symmetric_hash_value = neighbours[j].getSymmetricHash1();
-                        if(in_map(hash_value)){
-                            new_tuple = hashtoValue[hash_value];
-                            next_action_value += neighbours[j].proba*(get<0>(new_tuple));
+                        symmetric_hash_value1 = neighbours[j].getSymmetricHash1();
+                        symmetric_hash_value2 = neighbours[j].getSymmetricHash2();
+                        symmetric_hash_value3 = neighbours[j].getSymmetricHash3();
+                        getHashval = in_map(hash_value);
+                        symmetric_hash_val1 = in_map(symmetric_hash_value1);
+                        symmetric_hash_val2 = in_map(symmetric_hash_value2);
+                        symmetric_hash_val3 = in_map(symmetric_hash_value3);
+                        if(getHashval!=-1){
+                            next_action_value += neighbours[i].proba*(immediate_cost+discount * getHashval);
                         }
-                        else if(in_map(symmetric_hash_value)){
-                            new_tuple = hashtoValue[symmetric_hash_value];
-                            next_action_value += neighbours[j].proba*(get<0>(new_tuple));
+                        else if(symmetric_hash_val1!=-1){
+                            next_action_value += neighbours[i].proba*(immediate_cost+discount* symmetric_hash_val1);
+                        }
+                        else if(symmetric_hash_val2!=-1){
+                            next_action_value += neighbours[i].proba*(immediate_cost+discount* symmetric_hash_val2);
+                        }
+                        else if(symmetric_hash_val3!=-1){
+                            next_action_value += neighbours[i].proba*(immediate_cost+discount* symmetric_hash_val3);
                         }
                     }
-                    
-                    if (next_action_value < best_value){
+
+                    if (next_action_value!=0 && next_action_value < best_value){
                         best_action = actions[i];
                         best_value = next_action_value;
                     }
                 }
-                if(best_action!=get<2>(myTuple.second))
+                if(best_action!=get<1>(myTuple.second))
                     states_changed++;
-                hashtoValue[myTuple.first] = make_tuple(get<0>(myTuple.second),get<1>(myTuple.second),best_action);
-                
+                hashtoValue[myTuple.first] = make_tuple(get<0>(myTuple.second),best_action);
+
             }
-            cout << "Percent Policy Changes " << 100*(states_changed/((double)hashtoValue.size())) << endl;
-            cout << float(clock()-begin_time)/CLOCKS_PER_SEC << endl;
+            cerr << "Percent Policy Changes " << 100*(states_changed/((double)hashtoValue.size())) << endl;
+            cerr << float(clock()-begin_time)/CLOCKS_PER_SEC << endl;
+            if((float(clock()-begin_time)/CLOCKS_PER_SEC) >=15000){
+                 break;
+            }
             iterations++;
         }
-        
+
     }
-    
+
     //////////////////////////////////////////////////////////////////
-    
+
+    void operate_policy_result(){
+      string instructionIn = "";
+      int bestAction = 0;
+
+      while (true){
+          getline(cin, instructionIn);
+          applyInputInstruction(instructionIn);
+          bestAction = getBestAction();
+          gameState.applyMyAction(bestAction);
+          gameState.printMyAction(bestAction);
+      }
+    }
+
+    int getBestAction(){
+      if (hashtoValue.find(gameState.getSymmetricHash1()) != hashtoValue.end())
+          return Transform1(get<1>(hashtoValue[gameState.getSymmetricHash1()]));
+      if (hashtoValue.find(gameState.getSymmetricHash2()) != hashtoValue.end())
+          return Transform2(get<1>(hashtoValue[gameState.getSymmetricHash2()]));
+      if (hashtoValue.find(gameState.getSymmetricHash3()) != hashtoValue.end())
+          return Transform1(Transform2(get<1>(hashtoValue[gameState.getSymmetricHash3()])));
+      if(hashtoValue.find(gameState.getHash()) != hashtoValue.end())
+          return get<1>(hashtoValue[gameState.getHash()]);
+      else{
+          cerr << "Problem Here "<< endl;
+          return 0;
+        }
+    }
+
 };
 
 void getParams(int argc, char *argv[]){
@@ -854,7 +1060,7 @@ void getParams(int argc, char *argv[]){
 }
 
 int main(int argc, char *argv[]){
-    
+
     if (argc < 8){
         cout << "Run as \"./liftOperator <N> <K> <p> <q> <r> <discount> <maxIter>\"\n";
         return 0;
@@ -863,13 +1069,13 @@ int main(int argc, char *argv[]){
     getParams(argc, argv);
 
     LiftOperator liftOperator;
-    liftOperator.LearnMinCosts();
-    //  liftOperator.modified_policy_iteration();
-    
+    //liftOperator.LearnMinCosts();
+    liftOperator.modified_policy_iteration();
+
     cout << "0" << endl;
-    
+
     //    liftOperator.printPolicy();
-    liftOperator.operate();
-    
+    liftOperator.operate_policy_result();
+
     return 0;
 }
