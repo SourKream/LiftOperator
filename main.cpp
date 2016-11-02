@@ -437,8 +437,8 @@ public:
             action /= 5;
         }
 
-//        return cost + 2*numPeopleWaiting;
-        return numPeopleWaiting;
+        return cost + 2*numPeopleWaiting;
+        //return numPeopleWaiting;
     }
 
     float getliftcosts(State &g,int action,int lift){
@@ -933,12 +933,12 @@ public:
                 }
                 int min_action = actions[0];
                 for (int j=0;j<numActions;j++){
-                  cost_vector[actions[j]] = state.getImmediateCost(actions[j]);
+                  cost_vector[actions[j]] = state.getImmediateCost_2(actions[j]);
                   if (cost_vector[actions[j]] < min_action){
                       min_action = actions[j];
                   }
                 }
-                hashtoValue[i] = make_tuple(0,min_action);
+                hashtoValue[i] = make_tuple(0,actions[0]);
                 hashtoCost[i] = cost_vector;
               }
             }
@@ -1016,7 +1016,7 @@ public:
                 best_value = INT_MAX;
                 best_action = get<1>(myTuple.second);
                 for (int i=0; i<numActions; i++){
-                  const clock_t begin_time1 = clock();
+                  
                   vector<State> neighbours = state.getNeighboursForAction(actions[i]);
                   next_action_value = possible_actions[actions[i]];
                   
@@ -1038,12 +1038,13 @@ public:
                   }
                   
                 }
-            if(best_action!=get<1>(myTuple.second))
+            if(best_action!=get<1>(myTuple.second)){
                 states_changed++;
+            }
             hashtoValue[myTuple.first] = make_tuple(get<0>(myTuple.second),best_action);
 
           }
-          cerr << 100*(states_changed/((double)hashtoValue.size())) << endl;
+          cerr << "States Changed " << 100*(states_changed/((double)hashtoValue.size())) << endl;
           cerr << float(clock()-begin_time)/CLOCKS_PER_SEC << endl;
           iterations++;
         }
