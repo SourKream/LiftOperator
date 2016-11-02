@@ -7,10 +7,12 @@
 #include <string>
 #include <cstdlib>
 #include <map>
+#include <unordered_map>
 #include <time.h>
 
 using namespace std;
 
+#define K1 2
 
 int N, K, maxIter;
 float p, q, r, discount;
@@ -49,8 +51,8 @@ public:
 
     unsigned char UpButtons;
     unsigned char DownButtons;
-    vector<unsigned char> LiftPositions;
-    vector<unsigned char> LiftButtons;
+    unsigned char LiftPositions[K1];
+    unsigned char LiftButtons[K1];
 
     float proba;
 
@@ -59,8 +61,8 @@ public:
         DownButtons = 0;
         proba = 0;
         for (int i=0; i<K; i++){
-            LiftPositions.push_back(1);
-            LiftButtons.push_back(0);
+            LiftPositions[i] = 1;
+            LiftButtons[i] = 0;
         }
     }
 
@@ -69,15 +71,15 @@ public:
         DownButtons = g.DownButtons;
         proba = g.proba;
         for (int i=0; i<K; i++){
-            LiftPositions.push_back(g.LiftPositions[i]);
-            LiftButtons.push_back(g.LiftButtons[i]);
+            LiftPositions[i] = g.LiftPositions[i];
+            LiftButtons[i] = g.LiftButtons[i];
         }
     }
 
     State (unsigned long long hash){
         for (int i=0; i<K; i++){
-            LiftPositions.push_back(1);
-            LiftButtons.push_back(0);
+            LiftPositions[i] = 1;
+            LiftButtons[i] = 0;
         }
 
         DownButtons = (unsigned char) (((1 << (N-1)) - 1) & hash);
@@ -156,11 +158,11 @@ public:
     vector<State> getNeighboursForAction (int action){
 
         vector<State> neighbours;
-        vector<bool> AddUpFloors, AddDownFloors;
+        bool AddUpFloors[K1], AddDownFloors[K1];
 
         for (int i=0; i<K; i++){
-            AddUpFloors.push_back(false);
-            AddDownFloors.push_back(false);
+            AddUpFloors[i] = false;
+            AddDownFloors[i] = false;
         }
 
         // Adding consequent of action taken
@@ -424,9 +426,9 @@ public:
                 case 0:
                     break;
                 case 1:
-                    cost+=1;
+                    //cost+=1;
                     break;
-                case 2: cost += 1;
+                case 2: //cost += 1;
                     break;
                 case 3:
                 case 4:
@@ -647,7 +649,7 @@ class LiftOperator{
 
 public:
 
-    map<unsigned long long, int> hashToIdx;
+    unordered_map<unsigned long long, int> hashToIdx;
     int numStates = 0;
     vector<float> minCosts;
     vector<int> minCostActions;
@@ -872,7 +874,7 @@ public:
     //////////////////////////////////////////////////////////////////
     // Policy Iteration
 
-    map<unsigned long long, tuple<float,int,int>> hashtoValue; // every state has a value and the action
+    unordered_map<unsigned long long, tuple<float,int>> hashtoValue; // every state has a value and the action
 
     void initialiseValueStates(vector<State> states){
 
@@ -882,7 +884,7 @@ public:
                       State state(states[i].getHash());
                       int actions[(const int)pow(5, K)], numActions;
                       state.getActions(actions, numActions);
-                      hashtoValue[states[i].getHash()] = make_tuple(0,numStates++,actions[0]);
+                      hashtoValue[states[i].getHash()] = make_tuple(0,actions[0]);
                   }
                   //if(hashtoValue.find(states[i].getSymmetricHash2())==hashtoValue.end())
                     //if(hashtoValue.find(states[i].getSymmetricHash3())==hashtoValue.end())
@@ -895,7 +897,7 @@ public:
         State state(0);
         int actions[(const int)pow(5, K)], numActions;
         state.getActions(actions, numActions);
-        hashtoValue[0] = make_tuple(0,numStates++,actions[0]);// zero state
+        hashtoValue[0] = make_tuple(0,actions[0]);// zero state
         while(true){
             for (const auto &myTuple : hashtoValue){
                 State state(get<0>(myTuple));
@@ -912,7 +914,8 @@ public:
         }
     }
 
-    map<unsigned long long,vector<float>> hashtoCost;
+    unordered_map<unsigned long long,vector<float>> hashtoCost;
+
     void new_generate_states(){
       int max_size = 8388607;
       unsigned long long i=0;
@@ -923,31 +926,37 @@ public:
               if(hashtoValue.find(state.getHash()) == hashtoValue.end()){
                 int actions[(const int)pow(5, K)], numActions;
                 state.getActions(actions, numActions);
-                hashtoValue[i] = make_tuple(0,numStates++,actions[0]);
+
                 vector<float> cost_vector (25);
                 for (int j=0;j<25;j++){
                   cost_vector[j] = INT_MAX;
                 }
+                int min_action = actions[0];
                 for (int j=0;j<numActions;j++){
-                  cost_vector[actions[j]] = state.getImmediateCost_2(actions[j]);
+                  cost_vector[actions[j]] = state.getImmediateCost(actions[j]);
+                  if (cost_vector[actions[j]] < min_action){
+                      min_action = actions[j];
+                  }
                 }
+                hashtoValue[i] = make_tuple(0,min_action);
                 hashtoCost[i] = cost_vector;
-                cerr << numStates  << '\r';
               }
             }
         i++;
         }
-        cerr << numStates << endl;
       }
 
 
-      bool in_map(unsigned long long hash1){
-          if(hashtoValue.find(hash1)!=hashtoValue.end())
-            return true;
-          return false;
+      unordered_map<unsigned long long,tuple<float,int>>::iterator for_searching;
+      
+      float in_map(unsigned long long hash1){
+          for_searching = hashtoValue.find(hash1);
+          if(for_searching!=hashtoValue.end())
+            return get<0>(*for_searching);
+          return -1;
       }
 
-      void modified_policy_iteration(){
+    void modified_policy_iteration(){
         const clock_t begin_time = clock();
         new_generate_states();
 
@@ -957,73 +966,69 @@ public:
         int max_iterations = 10;
         // Create the policy graph and calculate the values for every state assuning 0 value for starting state(0 state)
         float new_value;
-        tuple<float,int,int> new_tuple;
+        tuple<float,int> new_tuple;
         State temp_state;
         int states_changed;
         while(iterations < max_iterations){
 
-          if((float(clock()-begin_time)/CLOCKS_PER_SEC) >=1700){
+          if((float(clock()-begin_time)/CLOCKS_PER_SEC) >=600){
               break;
           }
-          states_changed=0;
-          unsigned long long hash_value,symmetric_hash_value1,symmetric_hash_value2,symmetric_hash_value3;
+          
+          //unsigned long long hash_value,symmetric_hash_value2;
+          float hash_value,symmetric_hash_value2;
           for ( const auto &myTuple : hashtoValue ){
                 State state(myTuple.first);
-                //new_value = state.getImmediateCost_2(get<2>(myTuple.second));
-                new_value = hashtoCost[myTuple.first][get<2>(myTuple.second)];
-                vector<State> neighbours = state.getNeighboursForAction(get<2>(myTuple.second));
-
+                new_value = hashtoCost[myTuple.first][get<1>(myTuple.second)];
+                vector<State> neighbours = state.getNeighboursForAction(get<1>(myTuple.second));
+                
                 for (int i=0;i<neighbours.size();i++){
-                  hash_value = neighbours[i].getHash();
-
-                  symmetric_hash_value2 = neighbours[i].getSymmetricHash2();
-
-                  if(in_map(hash_value)){
-                    new_tuple = hashtoValue[hash_value];
-                    new_value += neighbours[i].proba*(discount* get<0>(new_tuple));
-
+                  hash_value = in_map(neighbours[i].getHash());
+                  symmetric_hash_value2 = in_map(neighbours[i].getSymmetricHash2());
+                  if(hash_value!=-1){
+                    new_value += neighbours[i].proba*(discount* hash_value);
                   }
 
-                  else if(in_map(symmetric_hash_value2)){
-                    new_tuple = hashtoValue[symmetric_hash_value2];
-                    new_value += neighbours[i].proba*(discount* get<0>(new_tuple));
+                  else{
+                    new_value += neighbours[i].proba*(discount* symmetric_hash_value2);
                   }
-
-
                 }
-
-                if(new_value!=get<0>(myTuple.second))
-                  states_changed++;
-                hashtoValue[myTuple.first] = make_tuple(new_value,get<1>(myTuple.second),get<2>(myTuple.second));
+                
+                
+                hashtoValue[myTuple.first] = make_tuple(new_value,get<1>(myTuple.second));
           }
-          cerr << "Percent Value Changes " << 100*(states_changed/((double)hashtoValue.size())) << endl;
+          
           cerr << float(clock()-begin_time)/CLOCKS_PER_SEC<<endl;
           // update the policy for each state
           int best_action,best_value,next_action_value;
           states_changed = 0;
+          int numActions;
+          vector<float> possible_actions;
           for ( const auto &myTuple : hashtoValue ){
+                
                 State state(myTuple.first);
                 int actions[(const int)pow(5, K)], numActions;
                 state.getActions(actions, numActions);
+                
+                
+                possible_actions = hashtoCost[myTuple.first];
+                
                 best_value = INT_MAX;
-                best_action = get<2>(myTuple.second);
+                best_action = get<1>(myTuple.second);
                 for (int i=0; i<numActions; i++){
+                  const clock_t begin_time1 = clock();
                   vector<State> neighbours = state.getNeighboursForAction(actions[i]);
-                  //next_action_value = state.getImmediateCost_2(actions[i]);
-                  next_action_value = hashtoCost[myTuple.first][actions[i]];
+                  next_action_value = possible_actions[actions[i]];
+                  
                   for (int j=0;j<neighbours.size();j++){
-                      hash_value = neighbours[j].getHash();
-
-                      symmetric_hash_value2 = neighbours[i].getSymmetricHash2();
-
-                      if(in_map(hash_value)){
-                          new_tuple = hashtoValue[hash_value];
-                          next_action_value += neighbours[j].proba*(discount* get<0>(new_tuple));
+                      hash_value = in_map(neighbours[j].getHash());
+                      symmetric_hash_value2 = in_map(neighbours[j].getSymmetricHash2());
+                      if(hash_value!=-1){
+                          next_action_value += neighbours[j].proba*(discount* hash_value);
                       }
 
-                      else if(in_map(symmetric_hash_value2)){
-                        new_tuple = hashtoValue[symmetric_hash_value2];
-                        next_action_value += neighbours[i].proba*(discount* get<0>(new_tuple));
+                      else{
+                          next_action_value += neighbours[j].proba*(discount* symmetric_hash_value2);
                       }
                   }
 
@@ -1031,20 +1036,19 @@ public:
                       best_action = actions[i];
                       best_value = next_action_value;
                   }
+                  
                 }
-            if(best_action!=get<2>(myTuple.second))
-              states_changed++;
-            hashtoValue[myTuple.first] = make_tuple(get<0>(myTuple.second),get<1>(myTuple.second),best_action);
+            if(best_action!=get<1>(myTuple.second))
+                states_changed++;
+            hashtoValue[myTuple.first] = make_tuple(get<0>(myTuple.second),best_action);
 
           }
-          cerr << "Percent Policy Changes " << 100*(states_changed/((double)hashtoValue.size())) << endl;
+          cerr << 100*(states_changed/((double)hashtoValue.size())) << endl;
           cerr << float(clock()-begin_time)/CLOCKS_PER_SEC << endl;
-          if(100*(states_changed/((double)hashtoValue.size())) < 2)
-            break;
           iterations++;
         }
 
-      }
+    }
 
 
     //////////////////////////////////////////////////////////////////
@@ -1056,7 +1060,6 @@ public:
       while (true){
           getline(cin, instructionIn);
           applyInputInstruction(instructionIn);
-          cerr << gameState.getHash() << endl;
           bestAction = getBestAction();
           gameState.applyMyAction(bestAction);
           gameState.printMyAction(bestAction);
@@ -1096,9 +1099,8 @@ int main(int argc, char *argv[]){
     getParams(argc, argv);
 
     LiftOperator liftOperator;
-    liftOperator.LearnMinCosts();
-    //liftOperator.modified_policy_iteration();
-
+    //liftOperator.LearnMinCosts();
+    liftOperator.modified_policy_iteration();
     cout << "0" << endl;
 
     //    liftOperator.printPolicy();
