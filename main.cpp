@@ -426,9 +426,9 @@ public:
                 case 0:
                     break;
                 case 1:
-                    //cost+=1;
+                    cost+=1;
                     break;
-                case 2: //cost += 1;
+                case 2: cost += 1;
                     break;
                 case 3:
                 case 4:
@@ -933,11 +933,12 @@ public:
                 }
                 int min_action = actions[0];
                 for (int j=0;j<numActions;j++){
-                  cost_vector[actions[j]] = state.getImmediateCost_2(actions[j]);
-                  if (cost_vector[actions[j]] < min_action){
+                  cost_vector[actions[j]] = state.getImmediateCost(actions[j]);
+                  if (cost_vector[actions[j]] < cost_vector[min_action]){
                       min_action = actions[j];
                   }
                 }
+                //hashtoValue[i] = make_tuple(cost_vector[min_action],min_action);
                 hashtoValue[i] = make_tuple(0,actions[0]);
                 hashtoCost[i] = cost_vector;
               }
@@ -966,18 +967,17 @@ public:
         int max_iterations = 10;
         // Create the policy graph and calculate the values for every state assuning 0 value for starting state(0 state)
         float new_value;
-        tuple<float,int> new_tuple;
-        State temp_state;
         int states_changed;
         while(iterations < max_iterations){
 
           if((float(clock()-begin_time)/CLOCKS_PER_SEC) >=600){
               break;
           }
+          states_changed=0;
           
-          //unsigned long long hash_value,symmetric_hash_value2;
           float hash_value,symmetric_hash_value2;
           for ( const auto &myTuple : hashtoValue ){
+                
                 State state(myTuple.first);
                 new_value = hashtoCost[myTuple.first][get<1>(myTuple.second)];
                 vector<State> neighbours = state.getNeighboursForAction(get<1>(myTuple.second));
@@ -989,20 +989,21 @@ public:
                     new_value += neighbours[i].proba*(discount* hash_value);
                   }
 
-                  else{
+                  else if(symmetric_hash_value2!=-1){
                     new_value += neighbours[i].proba*(discount* symmetric_hash_value2);
                   }
                 }
                 
-                
+                if(new_value!=get<0>(myTuple.second))
+                    states_changed++;
                 hashtoValue[myTuple.first] = make_tuple(new_value,get<1>(myTuple.second));
           }
           
+          cerr << "States Value Changed " << 100*(states_changed/((double)hashtoValue.size())) << endl;
           cerr << float(clock()-begin_time)/CLOCKS_PER_SEC<<endl;
           // update the policy for each state
           int best_action,best_value,next_action_value;
           states_changed = 0;
-          int numActions;
           vector<float> possible_actions;
           for ( const auto &myTuple : hashtoValue ){
                 
@@ -1027,7 +1028,7 @@ public:
                           next_action_value += neighbours[j].proba*(discount* hash_value);
                       }
 
-                      else{
+                      else if(symmetric_hash_value2!=-1){
                           next_action_value += neighbours[j].proba*(discount* symmetric_hash_value2);
                       }
                   }
@@ -1038,13 +1039,12 @@ public:
                   }
                   
                 }
-            if(best_action!=get<1>(myTuple.second)){
+            if(best_action != get<1>(myTuple.second)){
                 states_changed++;
             }
             hashtoValue[myTuple.first] = make_tuple(get<0>(myTuple.second),best_action);
-
           }
-          cerr << "States Changed " << 100*(states_changed/((double)hashtoValue.size())) << endl;
+          cerr << "States Policy Changed " << 100*(states_changed/((double)hashtoValue.size())) << endl;
           cerr << float(clock()-begin_time)/CLOCKS_PER_SEC << endl;
           iterations++;
         }
